@@ -1,10 +1,25 @@
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
-#[derive(Eq, Ord, Hash)]
 struct TreeNode {
     index: usize,
     content: String,
     children: Vec<TreeNode>,
+}
+
+trait Node: PartialEq + PartialOrd + Sized {
+    fn index(&self) -> usize;
+    fn children(&self) -> &[Self];
+}
+
+impl Node for TreeNode {
+    fn index(&self) -> usize {
+        self.index
+    }
+
+    fn children(&self) -> &[Self] {
+        &self.children[..]
+    }
 }
 
 impl TreeNode {
@@ -18,18 +33,6 @@ impl TreeNode {
         node.set_index(&mut 0);
 
         node
-    }
-
-    fn depth_priority_vec(&self) -> Vec<&TreeNode> {
-        let mut children: Vec<&TreeNode> = self
-            .children
-            .iter()
-            .flat_map(|c| c.depth_priority_vec())
-            .collect();
-
-        children.insert(0, self);
-
-        children
     }
 
     fn len(&self) -> usize {
@@ -46,9 +49,21 @@ impl TreeNode {
     }
 }
 
+fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
+    let mut children: Vec<&T> = node
+        .children()
+        .iter()
+        .flat_map(|c| depth_priority_vec(c))
+        .collect();
+
+    children.insert(0, node);
+
+    children
+}
+
 impl PartialEq for TreeNode {
     fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
+        self.content == other.content
     }
 }
 
@@ -81,49 +96,49 @@ fn main() {}
 
 // fn zhang_shasha_algorithm(x: &Node, y: &Node) -> (Mapping, Mapping) {}
 
-fn rep_cost(x: &TreeNode, y: &TreeNode) -> usize {
-    if x.content == y.content {
+fn rep_cost<T: Node>(x: &T, y: &T) -> usize {
+    if x == y {
         0
     } else {
         1
     }
 }
 
-fn ted(x: &TreeNode, y: &TreeNode) -> (Matrix<usize>, Matrix<usize>) {
-    let mut x_keyroots: Vec<&TreeNode> = keyroots(x).into_iter().collect();
-    let mut y_keyroots: Vec<&TreeNode> = keyroots(y).into_iter().collect();
-    x_keyroots.sort_by(|a, b| b.cmp(a));
-    y_keyroots.sort_by(|a, b| b.cmp(a));
+fn ted<T: Node>(x: &T, y: &T) -> (Matrix<usize>, Matrix<usize>) {
+    let mut x_keyroots: Vec<&T> = keyroots(x).into_iter().collect();
+    let mut y_keyroots: Vec<&T> = keyroots(y).into_iter().collect();
+    x_keyroots.reverse();
+    y_keyroots.reverse();
     let x_keyroots = x_keyroots;
     let y_keyroots = y_keyroots;
 
-    let xs = x.depth_priority_vec();
-    let ys = y.depth_priority_vec();
+    let xs = depth_priority_vec(x);
+    let ys = depth_priority_vec(y);
     let m = xs.len();
     let n = ys.len();
     let mut d: Matrix<usize> = vec![vec![0; n]; m];
     let mut D: Matrix<usize> = vec![vec![0; n + 1]; m + 1];
 
-    for k in x_keyroots.iter() {
-        for l in y_keyroots.iter() {
+    for &k in x_keyroots.iter() {
+        for &l in y_keyroots.iter() {
             let rlk = rl(k);
             let rll = rl(l);
 
-            D[rlk.index + 1][rll.index + 1] = 0;
+            D[rlk.index() + 1][rll.index() + 1] = 0;
 
-            for i in (k.index..rlk.index + 1).rev() {
-                D[i][rll.index + 1] = D[i + 1][rll.index + 1] + 1;
+            for i in (k.index()..rlk.index() + 1).rev() {
+                D[i][rll.index() + 1] = D[i + 1][rll.index() + 1] + 1;
             }
 
-            for j in (l.index..rll.index + 1).rev() {
-                D[rlk.index + 1][j] = D[rlk.index + 1][j + 1] + 1;
+            for j in (l.index()..rll.index() + 1).rev() {
+                D[rlk.index() + 1][j] = D[rlk.index() + 1][j + 1] + 1;
             }
 
-            for i in (k.index..rlk.index + 1).rev() {
-                for j in (l.index..rll.index + 1).rev() {
+            for i in (k.index()..rlk.index() + 1).rev() {
+                for j in (l.index()..rll.index() + 1).rev() {
                     let rli = rl(xs[i]);
                     let rlj = rl(ys[j]);
-                    if rli.index == rlk.index && rlj.index == rll.index {
+                    if rli.index() == rlk.index() && rlj.index() == rll.index() {
                         let costs = [
                             D[i + 1][j] + 1,
                             D[i][j + 1] + 1,
@@ -137,7 +152,7 @@ fn ted(x: &TreeNode, y: &TreeNode) -> (Matrix<usize>, Matrix<usize>) {
                         let costs = [
                             D[i + 1][j] + 1,
                             D[i][j + 1] + 1,
-                            D[rli.index + 1][rlj.index + 1] + d[i][j],
+                            D[rli.index() + 1][rlj.index() + 1] + d[i][j],
                         ];
 
                         D[i][j] = costs.into_iter().min().unwrap();
@@ -150,35 +165,35 @@ fn ted(x: &TreeNode, y: &TreeNode) -> (Matrix<usize>, Matrix<usize>) {
     return (D, d);
 }
 
-fn keyroots(root: &TreeNode) -> HashSet<&TreeNode> {
-    let mut rls = HashSet::new();
-    let mut krs = HashSet::new();
-    let nodes = root.depth_priority_vec();
+fn keyroots<T: Node>(root: &T) -> Vec<&T> {
+    let mut rls = Vec::new();
+    let mut krs = Vec::new();
+    let nodes = depth_priority_vec(root);
     for &n in nodes.iter() {
         let rl_node = rl(n);
-        if !rls.contains(&rl_node.index) {
-            rls.insert(rl_node.index);
-            krs.insert(n);
+        if !rls.contains(&rl_node.index()) {
+            rls.push(rl_node.index());
+            krs.push(n);
         }
     }
 
     krs
 }
 
-fn rl(node: &TreeNode) -> &TreeNode {
-    node.children.last().map(|c| rl(c)).unwrap_or(node)
+fn rl<T: Node>(node: &T) -> &T {
+    node.children().last().map(|c| rl(c)).unwrap_or(node)
 }
 
-fn backtrace<'a>(
-    x: &'a TreeNode,
-    y: &'a TreeNode,
+fn backtrace<'a, T: Node>(
+    x: &'a T,
+    y: &'a T,
     d: &mut Matrix<usize>,
     D: &mut Matrix<usize>,
-) -> Vec<ChangeType<&'a TreeNode>> {
+) -> Vec<ChangeType<&'a T>> {
     let mut map = vec![];
     backtr(
-        &x.depth_priority_vec(),
-        &y.depth_priority_vec(),
+        &depth_priority_vec(x),
+        &depth_priority_vec(y),
         d,
         D,
         &mut map,
@@ -189,12 +204,12 @@ fn backtrace<'a>(
     map
 }
 
-fn backtr<'a>(
-    xs: &Vec<&'a TreeNode>,
-    ys: &Vec<&'a TreeNode>,
+fn backtr<'a, T: Node>(
+    xs: &Vec<&'a T>,
+    ys: &Vec<&'a T>,
     d: &mut Matrix<usize>,
     D: &mut Matrix<usize>,
-    map: &mut Vec<ChangeType<&'a TreeNode>>,
+    map: &mut Vec<ChangeType<&'a T>>,
     mut i: usize,
     mut j: usize,
 ) {
@@ -204,25 +219,25 @@ fn backtr<'a>(
     let rll = rl(l);
 
     if i > 0 && j > 0 {
-        for i in (k.index..rlk.index + 1).rev() {
-            D[i][rll.index + 1] = D[i + 1][rll.index + 1] + 1;
+        for i in (k.index()..rlk.index() + 1).rev() {
+            D[i][rll.index() + 1] = D[i + 1][rll.index() + 1] + 1;
         }
 
-        for j in (l.index..rll.index + 1).rev() {
-            D[rlk.index + 1][j] = D[rlk.index + 1][j + 1] + 1;
+        for j in (l.index()..rll.index() + 1).rev() {
+            D[rlk.index() + 1][j] = D[rlk.index() + 1][j + 1] + 1;
         }
 
-        for i in (k.index..rlk.index + 1).rev() {
-            for j in (l.index..rll.index + 1).rev() {
+        for i in (k.index()..rlk.index() + 1).rev() {
+            for j in (l.index()..rll.index() + 1).rev() {
                 let rli = rl(xs[i]);
                 let rlj = rl(ys[j]);
-                if rli.index == rlk.index && rlj.index == rll.index {
-                    D[i][j] = D[rlk.index + 1][rll.index + 1] + d[i][j];
+                if rli.index() == rlk.index() && rlj.index() == rll.index() {
+                    D[i][j] = D[rlk.index() + 1][rll.index() + 1] + d[i][j];
                 } else {
                     let costs = [
                         D[i + 1][j] + 1,
                         D[i][j + 1] + 1,
-                        D[rli.index + 1][rlj.index + 1] + d[i][j],
+                        D[rli.index() + 1][rlj.index() + 1] + d[i][j],
                     ];
                     D[i][j] = costs.into_iter().min().unwrap();
                 }
@@ -230,10 +245,10 @@ fn backtr<'a>(
         }
     }
 
-    while i <= rlk.index && j <= rll.index {
+    while i <= rlk.index() && j <= rll.index() {
         let rli = rl(xs[i]);
         let rlj = rl(ys[j]);
-        if rli.index == rlk.index && rlj.index == rll.index {
+        if rli.index() == rlk.index() && rlj.index() == rll.index() {
             if D[i][j] == D[i + 1][j + 1] + rep_cost(xs[i], ys[j]) {
                 map.push(ChangeType::Update(xs[i], ys[j]));
                 i += 1;
@@ -241,10 +256,10 @@ fn backtr<'a>(
                 continue;
             }
         } else {
-            if D[i][j] == D[rli.index + 1][rlj.index + 1] + d[i][j] {
+            if D[i][j] == D[rli.index() + 1][rlj.index() + 1] + d[i][j] {
                 backtr(xs, ys, d, D, map, i, j);
-                i = rli.index + 1;
-                j = rlj.index + 1;
+                i = rli.index() + 1;
+                j = rlj.index() + 1;
                 continue;
             }
         }
@@ -342,9 +357,9 @@ mod test {
         let x = x_tree();
         let y = y_tree();
         let z = z_tree();
-        let xs = x.depth_priority_vec();
-        let ys = y.depth_priority_vec();
-        let zs = z.depth_priority_vec();
+        let xs = depth_priority_vec(&x);
+        let ys = depth_priority_vec(&y);
+        let zs = depth_priority_vec(&z);
         let (mut D, mut d) = ted(&x, &y);
         let m = backtrace(&x, &y, &mut d, &mut D);
 
@@ -367,16 +382,42 @@ mod test {
 
     #[test]
     fn delete_root_node() {
-        let x = x_tree();
-        let a = a_tree();
-        let xs = x.depth_priority_vec();
-        let nodes = a.depth_priority_vec();
+        let x = TreeNode::new(
+            "a",
+            vec![TreeNode::new("b", vec![TreeNode::new("c", vec![])])],
+        );
+        let y = TreeNode::new("b", vec![TreeNode::new("c", vec![])]);
+        let xs = depth_priority_vec(&x);
+        let ys = depth_priority_vec(&y);
 
-        let (mut D, mut d) = ted(&x, &a);
-        let m = backtrace(&x, &a, &mut d, &mut D);
+        let (mut D, mut d) = ted(&x, &y);
+        let m = backtrace(&x, &y, &mut d, &mut D);
         assert_eq!(m.len(), 2);
-        for (x, a) in [(xs[1], nodes[0]), (xs[3], nodes[1])] {
-            assert!(m.contains(&ChangeType::Update(x, a)));
+        for (x, y) in [(xs[1], ys[0]), (xs[2], ys[1])] {
+            assert!(m.contains(&ChangeType::Update(x, y)));
+        }
+    }
+
+    #[test]
+    fn replace_sibling_order() {
+        let x = TreeNode::new(
+            "a",
+            vec![TreeNode::new("b", vec![]), TreeNode::new("c", vec![])],
+        );
+
+        let y = TreeNode::new(
+            "a",
+            vec![TreeNode::new("c", vec![]), TreeNode::new("b", vec![])],
+        );
+
+        let (mut D, mut d) = ted(&x, &y);
+        let m = backtrace(&x, &y, &mut d, &mut D);
+        assert_eq!(m.len(), 3);
+        let xs = depth_priority_vec(&x);
+        let ys = depth_priority_vec(&y);
+
+        for (x, y) in [(xs[0], ys[0]), (xs[1], ys[1]), (xs[2], ys[2])] {
+            assert!(m.contains(&ChangeType::Update(x, y)));
         }
     }
 }
