@@ -189,6 +189,9 @@ fn backtrace<'a, T: Node>(
     y: &'a T,
     d: &mut Matrix<usize>,
     D: &mut Matrix<usize>,
+    insert: fn(&T) -> usize,
+    delete: fn(&T) -> usize,
+    replace: fn(&T, &T) -> usize,
 ) -> Vec<ChangeType<&'a T>> {
     let mut map = vec![];
     backtr(
@@ -199,6 +202,9 @@ fn backtrace<'a, T: Node>(
         &mut map,
         0,
         0,
+        insert,
+        delete,
+        replace,
     );
 
     map
@@ -212,6 +218,9 @@ fn backtr<'a, T: Node>(
     map: &mut Vec<ChangeType<&'a T>>,
     mut i: usize,
     mut j: usize,
+    insert: fn(&T) -> usize,
+    delete: fn(&T) -> usize,
+    replace: fn(&T, &T) -> usize,
 ) {
     let k = xs[i];
     let l = ys[j];
@@ -257,7 +266,7 @@ fn backtr<'a, T: Node>(
             }
         } else {
             if D[i][j] == D[rli.index() + 1][rlj.index() + 1] + d[i][j] {
-                backtr(xs, ys, d, D, map, i, j);
+                backtr(xs, ys, d, D, map, i, j, insert, delete, replace);
                 i = rli.index() + 1;
                 j = rlj.index() + 1;
                 continue;
@@ -352,6 +361,22 @@ mod test {
         let (D, _) = ted(&x, &y);
     }
 
+    fn insert<T: Node>(n: &T) -> usize {
+        1
+    }
+
+    fn delete<T: Node>(n: &T) -> usize {
+        1
+    }
+
+    fn replace<T: Node>(x: &T, y: &T) -> usize {
+        if x == y {
+            0
+        } else {
+            1
+        }
+    }
+
     #[test]
     fn mapping_test() {
         let x = x_tree();
@@ -361,14 +386,14 @@ mod test {
         let ys = depth_priority_vec(&y);
         let zs = depth_priority_vec(&z);
         let (mut D, mut d) = ted(&x, &y);
-        let m = backtrace(&x, &y, &mut d, &mut D);
+        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
 
         assert_eq!(m.len(), 2);
         assert!(m.contains(&ChangeType::Update(&xs[0], &ys[0])));
         assert!(m.contains(&ChangeType::Update(&xs[1], &ys[1])));
 
         let (mut D, mut d) = ted(&x, &z);
-        let m = backtrace(&x, &z, &mut d, &mut D);
+        let m = backtrace(&x, &z, &mut d, &mut D, insert, delete, replace);
         assert_eq!(m.len(), 4);
         for (x, z) in [
             (xs[0], zs[0]),
@@ -391,7 +416,7 @@ mod test {
         let ys = depth_priority_vec(&y);
 
         let (mut D, mut d) = ted(&x, &y);
-        let m = backtrace(&x, &y, &mut d, &mut D);
+        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
         assert_eq!(m.len(), 2);
         for (x, y) in [(xs[1], ys[0]), (xs[2], ys[1])] {
             assert!(m.contains(&ChangeType::Update(x, y)));
@@ -411,13 +436,29 @@ mod test {
         );
 
         let (mut D, mut d) = ted(&x, &y);
-        let m = backtrace(&x, &y, &mut d, &mut D);
+        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
         assert_eq!(m.len(), 3);
         let xs = depth_priority_vec(&x);
         let ys = depth_priority_vec(&y);
 
         for (x, y) in [(xs[0], ys[0]), (xs[1], ys[1]), (xs[2], ys[2])] {
             assert!(m.contains(&ChangeType::Update(x, y)));
+        }
+    }
+
+    #[test]
+    fn replace_ancestor_order() {
+        let x = TreeNode::new("a", vec![TreeNode::new("b", vec![])]);
+        let y = TreeNode::new("b", vec![TreeNode::new("a", vec![])]);
+
+        let (mut D, mut d) = ted(&x, &y);
+        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
+        assert_eq!(m.len(), 2);
+        let xs = depth_priority_vec(&x);
+        let ys = depth_priority_vec(&y);
+
+        for (x, y) in [(xs[0], ys[0]), (xs[1], ys[1])] {
+            assert!(m.contains(&ChangeType::Update(&x, &y)));
         }
     }
 }
