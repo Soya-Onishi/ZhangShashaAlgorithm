@@ -168,89 +168,83 @@ fn backtrace<'a>(
     D: &mut Matrix<usize>,
 ) -> Vec<ChangeType<&'a Node>> {
     let mut map = vec![];
-    backtr(x, y, d, D, &mut map, x, y);
+    backtr(
+        &x.depth_priority_vec(),
+        &y.depth_priority_vec(),
+        d,
+        D,
+        &mut map,
+        0,
+        0,
+    );
 
     map
 }
 
 fn backtr<'a>(
-    x: &Node,
-    y: &Node,
+    xs: &Vec<&'a Node>,
+    ys: &Vec<&'a Node>,
     d: &mut Matrix<usize>,
     D: &mut Matrix<usize>,
     map: &mut Vec<ChangeType<&'a Node>>,
-    k: &'a Node,
-    l: &'a Node,
+    mut i: usize,
+    mut j: usize,
 ) {
-    let k_nodes = k.depth_priority_vec();
-    let l_nodes = l.depth_priority_vec();
-    if k.index > 0 && l.index > 0 {
-        for i in k_nodes.iter().rev() {
-            D[i.index][rl(l).index + 1] = D[i.index + 1][rl(l).index + 1] + 1;
+    let k = xs[i];
+    let l = ys[j];
+    let rlk = rl(k);
+    let rll = rl(l);
+
+    if i > 0 && j > 0 {
+        for i in rlk.index..k.index {
+            D[i][rll.index + 1] = D[i + 1][rll.index + 1] + 1;
         }
 
-        for j in l_nodes.iter().rev() {
-            D[rl(k).index + 1][j.index] = D[rl(k).index + 1][j.index + 1] + 1;
+        for j in rll.index..l.index {
+            D[rlk.index + 1][j] = D[rlk.index + 1][j + 1] + 1;
         }
 
-        for i in k_nodes.iter().rev() {
-            for j in l_nodes.iter().rev() {
-                if rl(i).index == rl(k).index && rl(j).index == rl(l).index {
-                    D[i.index][j.index] = d[i.index][j.index] + D[rl(k).index + 1][rl(l).index + 1];
+        for i in rlk.index..k.index {
+            for j in rll.index..l.index {
+                let rli = rl(xs[i]);
+                let rlj = rl(ys[j]);
+                if rli.index == rlk.index && rlj.index == rll.index {
+                    D[i][j] = D[rlk.index + 1][rll.index + 1] + d[i][j];
                 } else {
                     let costs = [
-                        D[i.index + 1][j.index] + 1,
-                        D[i.index][j.index + 1] + 1,
-                        D[rl(i).index + 1][rl(j).index + 1] + d[i.index][j.index],
+                        D[i + 1][j] + 1,
+                        D[i][j + 1] + 1,
+                        D[rli.index + 1][rlj.index + 1] + d[i][j],
                     ];
-
-                    D[i.index][j.index] = costs.into_iter().min().unwrap();
+                    D[i][j] = costs.into_iter().min().unwrap();
                 }
             }
         }
     }
 
-    let k_nodes = k.depth_priority_vec();
-    let l_nodes = l.depth_priority_vec();
-    let mut k_nodes = k_nodes.iter();
-    let mut l_nodes = l_nodes.iter();
-    let mut i_node = k_nodes.next();
-    let mut j_node = l_nodes.next();
-
-    while let Some((i, j)) = i_node.zip(j_node) {
-        if rl(i).index == rl(k).index && rl(j).index == rl(l).index {
-            if D[i.index][j.index] == D[i.index + 1][j.index + 1] + rep_cost(i, j) {
-                map.push(ChangeType::Update(i, j));
-                i_node = k_nodes.next();
-                j_node = l_nodes.next();
+    while i <= rlk.index && j <= rll.index {
+        let rli = rl(xs[i]);
+        let rlj = rl(ys[j]);
+        if rli.index == rli.index && rlj.index == rlj.index {
+            if D[i][j] == D[i + 1][j + 1] + rep_cost(xs[i], ys[j]) {
+                map.push(ChangeType::Update(xs[i], ys[j]));
+                i += 1;
+                j += 1;
                 continue;
             }
         } else {
-            if D[i.index][j.index] == D[rl(i).index + 1][rl(j).index + 1] + d[i.index][j.index] {
-                backtr(x, y, d, D, map, i, j);
-                let rli = rl(i);
-                let rlj = rl(j);
-
-                i_node = if rli.index == i.index {
-                    k_nodes.next()
-                } else {
-                    k_nodes.find(|n| n.index == rli.index)
-                };
-                j_node = if rlj.index == j.index {
-                    l_nodes.next()
-                } else {
-                    l_nodes.find(|n| n.index == rlj.index)
-                };
-
+            if D[i][j] == D[rli.index + 1][rlj.index + 1] + rep_cost(xs[i], ys[j]) {
+                backtr(xs, ys, d, D, map, i, j);
+                i = rli.index + 1;
+                j = rlj.index + 1;
                 continue;
             }
         }
-        if D[i.index][j.index] == D[i.index + 1][j.index] + 1 {
-            i_node = k_nodes.next();
-            continue;
-        } else if D[i.index][j.index] == D[i.index][j.index + 1] + 1 {
-            j_node = l_nodes.next();
-            continue;
+
+        if D[i][j] == D[i + 1][j] + 1 {
+            i = i + 1;
+        } else if D[i][j] == D[i][j + 1] + 1 {
+            j = j + 1;
         }
     }
 }
