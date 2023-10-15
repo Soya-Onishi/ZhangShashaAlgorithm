@@ -208,7 +208,7 @@ fn backtr<'a>(
             D[i][rll.index + 1] = D[i + 1][rll.index + 1] + 1;
         }
 
-        for j in l.index..(rll.index + 1) {
+        for j in (l.index..rll.index + 1).rev() {
             D[rlk.index + 1][j] = D[rlk.index + 1][j + 1] + 1;
         }
 
@@ -241,7 +241,7 @@ fn backtr<'a>(
                 continue;
             }
         } else {
-            if D[i][j] == D[rli.index + 1][rlj.index + 1] + rep_cost(xs[i], ys[j]) {
+            if D[i][j] == D[rli.index + 1][rlj.index + 1] + d[i][j] {
                 backtr(xs, ys, d, D, map, i, j);
                 i = rli.index + 1;
                 j = rlj.index + 1;
@@ -287,6 +287,10 @@ mod test {
                 TreeNode::new("e", vec![]),
             ],
         )
+    }
+
+    fn a_tree() -> TreeNode {
+        TreeNode::new("b", vec![TreeNode::new("d", vec![])])
     }
 
     #[test]
@@ -346,7 +350,7 @@ mod test {
 
         assert_eq!(m.len(), 2);
         assert!(m.contains(&ChangeType::Update(&xs[0], &ys[0])));
-        assert!(m.contains(&ChangeType::Update(&xs[2], &ys[1])));
+        assert!(m.contains(&ChangeType::Update(&xs[1], &ys[1])));
 
         let (mut D, mut d) = ted(&x, &z);
         let m = backtrace(&x, &z, &mut d, &mut D);
@@ -362,9 +366,17 @@ mod test {
     }
 
     #[test]
-    fn iter_test() {
-        for i in (0..5).rev() {
-            println!("{}", i);
+    fn delete_root_node() {
+        let x = x_tree();
+        let a = a_tree();
+        let xs = x.depth_priority_vec();
+        let nodes = a.depth_priority_vec();
+
+        let (mut D, mut d) = ted(&x, &a);
+        let m = backtrace(&x, &a, &mut d, &mut D);
+        assert_eq!(m.len(), 2);
+        for (x, a) in [(xs[1], nodes[0]), (xs[3], nodes[1])] {
+            assert!(m.contains(&ChangeType::Update(x, a)));
         }
     }
 }
