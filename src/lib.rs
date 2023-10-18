@@ -11,7 +11,6 @@ pub enum ChangeType<T: PartialEq> {
     None,
 }
 
-type Mapping<T> = std::collections::HashMap<usize, ChangeType<T>>;
 type Matrix<T> = Vec<Vec<T>>;
 
 pub fn diff<'a, T: Node>(x: &'a T, y: &'a T) -> Vec<ChangeType<&'a T>> {
@@ -37,8 +36,16 @@ pub fn diff_with_costfn<'a, T: Node>(
     delete: fn(&T) -> usize,
     replace: fn(&T, &T) -> usize,
 ) -> Vec<ChangeType<&'a T>> {
-    let (mut D, mut d) = ted(x, y, insert, delete, replace);
-    let mut map = backtrace(x, y, &mut d, &mut D, insert, delete, replace);
+    let (mut forest_ted, mut subtree_ted) = ted(x, y, insert, delete, replace);
+    let mut map = backtrace(
+        x,
+        y,
+        &mut subtree_ted,
+        &mut forest_ted,
+        insert,
+        delete,
+        replace,
+    );
     push_insert_and_delete(&mut map, x, y);
 
     map
@@ -62,22 +69,22 @@ fn ted<T: Node>(
     let ys = depth_priority_vec(y);
     let m = xs.len();
     let n = ys.len();
-    let mut d: Matrix<usize> = vec![vec![0; n]; m];
-    let mut D: Matrix<usize> = vec![vec![0; n + 1]; m + 1];
+    let mut subtree_ted: Matrix<usize> = vec![vec![0; n]; m];
+    let mut forest_ted: Matrix<usize> = vec![vec![0; n + 1]; m + 1];
 
     for &k in x_keyroots.iter() {
         for &l in y_keyroots.iter() {
             let rlk = rl(k);
             let rll = rl(l);
 
-            D[rlk.index() + 1][rll.index() + 1] = 0;
+            forest_ted[rlk.index() + 1][rll.index() + 1] = 0;
 
             for i in (k.index()..rlk.index() + 1).rev() {
-                D[i][rll.index() + 1] = D[i + 1][rll.index() + 1] + delete(xs[i]);
+                forest_ted[i][rll.index() + 1] = forest_ted[i + 1][rll.index() + 1] + delete(xs[i]);
             }
 
             for j in (l.index()..rll.index() + 1).rev() {
-                D[rlk.index() + 1][j] = D[rlk.index() + 1][j + 1] + insert(ys[j]);
+                forest_ted[rlk.index() + 1][j] = forest_ted[rlk.index() + 1][j + 1] + insert(ys[j]);
             }
 
             for i in (k.index()..rlk.index() + 1).rev() {
@@ -86,29 +93,29 @@ fn ted<T: Node>(
                     let rlj = rl(ys[j]);
                     if rli.index() == rlk.index() && rlj.index() == rll.index() {
                         let costs = [
-                            D[i + 1][j] + delete(xs[i]),
-                            D[i][j + 1] + insert(ys[j]),
-                            D[i + 1][j + 1] + replace(xs[i], ys[j]),
+                            forest_ted[i + 1][j] + delete(xs[i]),
+                            forest_ted[i][j + 1] + insert(ys[j]),
+                            forest_ted[i + 1][j + 1] + replace(xs[i], ys[j]),
                         ];
 
                         let cost = costs.into_iter().min().unwrap();
-                        D[i][j] = cost;
-                        d[i][j] = cost;
+                        forest_ted[i][j] = cost;
+                        subtree_ted[i][j] = cost;
                     } else {
                         let costs = [
-                            D[i + 1][j] + delete(xs[i]),
-                            D[i][j + 1] + insert(ys[j]),
-                            D[rli.index() + 1][rlj.index() + 1] + d[i][j],
+                            forest_ted[i + 1][j] + delete(xs[i]),
+                            forest_ted[i][j + 1] + insert(ys[j]),
+                            forest_ted[rli.index() + 1][rlj.index() + 1] + subtree_ted[i][j],
                         ];
 
-                        D[i][j] = costs.into_iter().min().unwrap();
+                        forest_ted[i][j] = costs.into_iter().min().unwrap();
                     }
                 }
             }
         }
     }
 
-    return (D, d);
+    return (forest_ted, subtree_ted);
 }
 
 fn keyroots<T: Node>(root: &T) -> Vec<&T> {
@@ -133,8 +140,8 @@ fn rl<T: Node>(node: &T) -> &T {
 fn backtrace<'a, T: Node>(
     x: &'a T,
     y: &'a T,
-    d: &mut Matrix<usize>,
-    D: &mut Matrix<usize>,
+    subtree_ted: &mut Matrix<usize>,
+    forest_ted: &mut Matrix<usize>,
     insert: fn(&T) -> usize,
     delete: fn(&T) -> usize,
     replace: fn(&T, &T) -> usize,
@@ -143,8 +150,8 @@ fn backtrace<'a, T: Node>(
     backtr(
         &depth_priority_vec(x),
         &depth_priority_vec(y),
-        d,
-        D,
+        subtree_ted,
+        forest_ted,
         &mut map,
         0,
         0,
@@ -159,8 +166,8 @@ fn backtrace<'a, T: Node>(
 fn backtr<'a, T: Node>(
     xs: &Vec<&'a T>,
     ys: &Vec<&'a T>,
-    d: &mut Matrix<usize>,
-    D: &mut Matrix<usize>,
+    subtree_ted: &mut Matrix<usize>,
+    forest_ted: &mut Matrix<usize>,
     map: &mut Vec<ChangeType<&'a T>>,
     mut i: usize,
     mut j: usize,
@@ -175,11 +182,11 @@ fn backtr<'a, T: Node>(
 
     if i > 0 && j > 0 {
         for i in (k.index()..rlk.index() + 1).rev() {
-            D[i][rll.index() + 1] = D[i + 1][rll.index() + 1] + delete(xs[i]);
+            forest_ted[i][rll.index() + 1] = forest_ted[i + 1][rll.index() + 1] + delete(xs[i]);
         }
 
         for j in (l.index()..rll.index() + 1).rev() {
-            D[rlk.index() + 1][j] = D[rlk.index() + 1][j + 1] + insert(ys[j]);
+            forest_ted[rlk.index() + 1][j] = forest_ted[rlk.index() + 1][j + 1] + insert(ys[j]);
         }
 
         for i in (k.index()..rlk.index() + 1).rev() {
@@ -187,14 +194,15 @@ fn backtr<'a, T: Node>(
                 let rli = rl(xs[i]);
                 let rlj = rl(ys[j]);
                 if rli.index() == rlk.index() && rlj.index() == rll.index() {
-                    D[i][j] = D[rlk.index() + 1][rll.index() + 1] + d[i][j];
+                    forest_ted[i][j] =
+                        forest_ted[rlk.index() + 1][rll.index() + 1] + subtree_ted[i][j];
                 } else {
                     let costs = [
-                        D[i + 1][j] + delete(xs[i]),
-                        D[i][j + 1] + insert(ys[j]),
-                        D[rli.index() + 1][rlj.index() + 1] + d[i][j],
+                        forest_ted[i + 1][j] + delete(xs[i]),
+                        forest_ted[i][j + 1] + insert(ys[j]),
+                        forest_ted[rli.index() + 1][rlj.index() + 1] + subtree_ted[i][j],
                     ];
-                    D[i][j] = costs.into_iter().min().unwrap();
+                    forest_ted[i][j] = costs.into_iter().min().unwrap();
                 }
             }
         }
@@ -204,24 +212,36 @@ fn backtr<'a, T: Node>(
         let rli = rl(xs[i]);
         let rlj = rl(ys[j]);
         if rli.index() == rlk.index() && rlj.index() == rll.index() {
-            if D[i][j] == D[i + 1][j + 1] + replace(xs[i], ys[j]) {
+            if forest_ted[i][j] == forest_ted[i + 1][j + 1] + replace(xs[i], ys[j]) {
                 map.push(ChangeType::Update(xs[i], ys[j]));
                 i += 1;
                 j += 1;
                 continue;
             }
         } else {
-            if D[i][j] == D[rli.index() + 1][rlj.index() + 1] + d[i][j] {
-                backtr(xs, ys, d, D, map, i, j, insert, delete, replace);
+            if forest_ted[i][j] == forest_ted[rli.index() + 1][rlj.index() + 1] + subtree_ted[i][j]
+            {
+                backtr(
+                    xs,
+                    ys,
+                    subtree_ted,
+                    forest_ted,
+                    map,
+                    i,
+                    j,
+                    insert,
+                    delete,
+                    replace,
+                );
                 i = rli.index() + 1;
                 j = rlj.index() + 1;
                 continue;
             }
         }
 
-        if D[i][j] == D[i + 1][j] + delete(xs[i]) {
+        if forest_ted[i][j] == forest_ted[i + 1][j] + delete(xs[i]) {
             i = i + 1;
-        } else if D[i][j] == D[i][j + 1] + insert(ys[j]) {
+        } else if forest_ted[i][j] == forest_ted[i][j + 1] + insert(ys[j]) {
             j = j + 1;
         }
     }
@@ -368,10 +388,6 @@ mod test {
         )
     }
 
-    fn a_tree() -> TreeNode {
-        TreeNode::new("b", vec![TreeNode::new("d", vec![])])
-    }
-
     #[test]
     fn index_test() {
         let x = x_tree();
@@ -413,14 +429,14 @@ mod test {
     fn ted_test() {
         let x = x_tree();
         let y = y_tree();
-        let (D, _) = ted(&x, &y, insert, delete, replace);
+        let (_, _) = ted(&x, &y, insert, delete, replace);
     }
 
-    fn insert<T: Node>(n: &T) -> usize {
+    fn insert<T: Node>(_: &T) -> usize {
         1
     }
 
-    fn delete<T: Node>(n: &T) -> usize {
+    fn delete<T: Node>(_: &T) -> usize {
         1
     }
 
@@ -440,15 +456,31 @@ mod test {
         let xs = depth_priority_vec(&x);
         let ys = depth_priority_vec(&y);
         let zs = depth_priority_vec(&z);
-        let (mut D, mut d) = ted(&x, &y, insert, delete, replace);
-        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &y, insert, delete, replace);
+        let m = backtrace(
+            &x,
+            &y,
+            &mut subtree_ted,
+            &mut forest_ted,
+            insert,
+            delete,
+            replace,
+        );
 
         assert_eq!(m.len(), 2);
         assert!(m.contains(&ChangeType::Update(&xs[0], &ys[0])));
         assert!(m.contains(&ChangeType::Update(&xs[1], &ys[1])));
 
-        let (mut D, mut d) = ted(&x, &z, insert, delete, replace);
-        let m = backtrace(&x, &z, &mut d, &mut D, insert, delete, replace);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &z, insert, delete, replace);
+        let m = backtrace(
+            &x,
+            &z,
+            &mut subtree_ted,
+            &mut forest_ted,
+            insert,
+            delete,
+            replace,
+        );
         assert_eq!(m.len(), 4);
         for (x, z) in [
             (xs[0], zs[0]),
@@ -470,8 +502,16 @@ mod test {
         let xs = depth_priority_vec(&x);
         let ys = depth_priority_vec(&y);
 
-        let (mut D, mut d) = ted(&x, &y, insert, delete, replace);
-        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &y, insert, delete, replace);
+        let m = backtrace(
+            &x,
+            &y,
+            &mut subtree_ted,
+            &mut forest_ted,
+            insert,
+            delete,
+            replace,
+        );
         assert_eq!(m.len(), 2);
         for (x, y) in [(xs[1], ys[0]), (xs[2], ys[1])] {
             assert!(m.contains(&ChangeType::Update(x, y)));
@@ -490,8 +530,16 @@ mod test {
             vec![TreeNode::new("c", vec![]), TreeNode::new("b", vec![])],
         );
 
-        let (mut D, mut d) = ted(&x, &y, insert, delete, replace);
-        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &y, insert, delete, replace);
+        let m = backtrace(
+            &x,
+            &y,
+            &mut subtree_ted,
+            &mut forest_ted,
+            insert,
+            delete,
+            replace,
+        );
         assert_eq!(m.len(), 3);
         let xs = depth_priority_vec(&x);
         let ys = depth_priority_vec(&y);
@@ -516,16 +564,32 @@ mod test {
         let xs = depth_priority_vec(&x);
         let ys = depth_priority_vec(&y);
 
-        let (mut D, mut d) = ted(&x, &y, insert, delete, replace);
-        let m = backtrace(&x, &y, &mut d, &mut D, insert, delete, replace);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &y, insert, delete, replace);
+        let m = backtrace(
+            &x,
+            &y,
+            &mut subtree_ted,
+            &mut forest_ted,
+            insert,
+            delete,
+            replace,
+        );
         assert_eq!(m.len(), 2);
 
         for (x, y) in [(xs[0], ys[0]), (xs[1], ys[1])] {
             assert!(m.contains(&ChangeType::Update(&x, &y)));
         }
 
-        let (mut D, mut d) = ted(&x, &y, |_| 2, |_| 2, rep0);
-        let m = backtrace(&x, &y, &mut d, &mut D, |_| 2, |_| 2, rep0);
+        let (mut forest_ted, mut subtree_ted) = ted(&x, &y, |_| 2, |_| 2, rep0);
+        let m = backtrace(
+            &x,
+            &y,
+            &mut subtree_ted,
+            &mut forest_ted,
+            |_| 2,
+            |_| 2,
+            rep0,
+        );
         assert_eq!(m.len(), 1);
         assert_eq!(m[0], ChangeType::Update(xs[1], ys[0]));
     }
