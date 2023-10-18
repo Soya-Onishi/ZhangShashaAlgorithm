@@ -1,50 +1,6 @@
-#[derive(Debug)]
-struct TreeNode {
-    index: usize,
-    content: String,
-    children: Vec<TreeNode>,
-}
-
 trait Node: PartialEq + PartialOrd + Sized {
     fn index(&self) -> usize;
     fn children(&self) -> &[Self];
-}
-
-impl Node for TreeNode {
-    fn index(&self) -> usize {
-        self.index
-    }
-
-    fn children(&self) -> &[Self] {
-        &self.children[..]
-    }
-}
-
-impl TreeNode {
-    fn new<T: Into<String>>(content: T, children: Vec<TreeNode>) -> TreeNode {
-        let mut node = TreeNode {
-            index: 0,
-            content: content.into(),
-            children,
-        };
-
-        node.set_index(&mut 0);
-
-        node
-    }
-
-    fn len(&self) -> usize {
-        self.children.iter().map(|c| c.len()).sum::<usize>() + 1
-    }
-
-    fn set_index(&mut self, base_index: &mut usize) {
-        self.index = *base_index;
-
-        for c in self.children.iter_mut() {
-            *base_index = *base_index + 1;
-            c.set_index(base_index)
-        }
-    }
 }
 
 fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
@@ -57,26 +13,6 @@ fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
     children.insert(0, node);
 
     children
-}
-
-impl PartialEq for TreeNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.content == other.content
-    }
-}
-
-impl PartialOrd for TreeNode {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let cmp = if self.index > other.index {
-            std::cmp::Ordering::Greater
-        } else if self.index < other.index {
-            std::cmp::Ordering::Less
-        } else {
-            std::cmp::Ordering::Equal
-        };
-
-        Some(cmp)
-    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -288,6 +224,66 @@ fn backtr<'a, T: Node>(
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[derive(Debug)]
+    struct TreeNode {
+        index: usize,
+        content: String,
+        children: Vec<TreeNode>,
+    }
+
+    impl Node for TreeNode {
+        fn index(&self) -> usize {
+            self.index
+        }
+
+        fn children(&self) -> &[Self] {
+            &self.children[..]
+        }
+    }
+
+    impl PartialEq for TreeNode {
+        fn eq(&self, other: &Self) -> bool {
+            self.content == other.content
+        }
+    }
+
+    impl PartialOrd for TreeNode {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            let cmp = if self.index > other.index {
+                std::cmp::Ordering::Greater
+            } else if self.index < other.index {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            };
+
+            Some(cmp)
+        }
+    }
+
+    impl TreeNode {
+        fn new<T: Into<String>>(content: T, children: Vec<TreeNode>) -> TreeNode {
+            let mut node = TreeNode {
+                index: 0,
+                content: content.into(),
+                children,
+            };
+
+            node.set_index(&mut 0);
+
+            node
+        }
+
+        fn set_index(&mut self, base_index: &mut usize) {
+            self.index = *base_index;
+
+            for c in self.children.iter_mut() {
+                *base_index = *base_index + 1;
+                c.set_index(base_index)
+            }
+        }
+    }
 
     fn x_tree() -> TreeNode {
         TreeNode::new(
