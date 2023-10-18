@@ -239,7 +239,7 @@ fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
     children
 }
 
-fn push_insert_and_delete<T: Node>(map: &mut Vec<ChangeType<&T>>, x: &T, y: &T) {
+fn push_insert_and_delete<'a, T: Node>(map: &mut Vec<ChangeType<&'a T>>, x: &'a T, y: &'a T) {
     let xs = depth_priority_vec(x);
     let ys = depth_priority_vec(y);
     let mut xs = xs.iter();
@@ -247,7 +247,7 @@ fn push_insert_and_delete<T: Node>(map: &mut Vec<ChangeType<&T>>, x: &T, y: &T) 
     let mut additional_map = Vec::new();
     for m in map.iter() {
         if let ChangeType::Update(x, y) = m {
-            for x_node in &mut xs {
+            for &x_node in &mut xs {
                 if x_node.index() == x.index() {
                     break;
                 }
@@ -255,7 +255,7 @@ fn push_insert_and_delete<T: Node>(map: &mut Vec<ChangeType<&T>>, x: &T, y: &T) 
                 additional_map.push(ChangeType::Delete(x_node));
             }
 
-            for y_node in &mut ys {
+            for &y_node in &mut ys {
                 if y_node.index() == y.index() {
                     break;
                 }
@@ -265,13 +265,15 @@ fn push_insert_and_delete<T: Node>(map: &mut Vec<ChangeType<&T>>, x: &T, y: &T) 
         }
     }
 
-    for x in xs {
+    for &x in xs {
         additional_map.push(ChangeType::Delete(x));
     }
 
-    for y in ys {
+    for &y in ys {
         additional_map.push(ChangeType::Insert(y));
     }
+
+    map.append(&mut additional_map);
 }
 
 #[cfg(test)]
@@ -526,5 +528,21 @@ mod test {
         let m = backtrace(&x, &y, &mut d, &mut D, |_| 2, |_| 2, rep0);
         assert_eq!(m.len(), 1);
         assert_eq!(m[0], ChangeType::Update(xs[1], ys[0]));
+    }
+
+    #[test]
+    fn diff_basic_tree() {
+        let x = x_tree();
+        let y = y_tree();
+        let xs = depth_priority_vec(&x);
+        let ys = depth_priority_vec(&y);
+        let m = diff(&x, &y);
+
+        assert_eq!(m.len(), 5);
+        assert!(m.contains(&ChangeType::Update(&xs[0], &ys[0])));
+        assert!(m.contains(&ChangeType::Update(&xs[1], &ys[1])));
+        assert!(m.contains(&ChangeType::Delete(&xs[2])));
+        assert!(m.contains(&ChangeType::Delete(&xs[3])));
+        assert!(m.contains(&ChangeType::Delete(&xs[4])));
     }
 }
