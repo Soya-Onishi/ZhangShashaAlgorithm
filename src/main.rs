@@ -1,22 +1,10 @@
-trait Node: PartialEq + PartialOrd + Sized {
+pub trait Node: PartialEq + PartialOrd + Sized {
     fn index(&self) -> usize;
     fn children(&self) -> &[Self];
 }
 
-fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
-    let mut children: Vec<&T> = node
-        .children()
-        .iter()
-        .flat_map(|c| depth_priority_vec(c))
-        .collect();
-
-    children.insert(0, node);
-
-    children
-}
-
 #[derive(PartialEq, Debug)]
-enum ChangeType<T: PartialEq> {
+pub enum ChangeType<T: PartialEq> {
     Delete(T),
     Insert(T),
     Update(T, T),
@@ -27,16 +15,6 @@ type Mapping<T> = std::collections::HashMap<usize, ChangeType<T>>;
 type Matrix<T> = Vec<Vec<T>>;
 
 fn main() {}
-
-// fn zhang_shasha_algorithm(x: &Node, y: &Node) -> (Mapping, Mapping) {}
-
-fn rep_cost<T: Node>(x: &T, y: &T) -> usize {
-    if x == y {
-        0
-    } else {
-        1
-    }
-}
 
 fn ted<T: Node>(
     x: &T,
@@ -219,6 +197,18 @@ fn backtr<'a, T: Node>(
             j = j + 1;
         }
     }
+}
+
+fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
+    let mut children: Vec<&T> = node
+        .children()
+        .iter()
+        .flat_map(|c| depth_priority_vec(c))
+        .collect();
+
+    children.insert(0, node);
+
+    children
 }
 
 #[cfg(test)]
