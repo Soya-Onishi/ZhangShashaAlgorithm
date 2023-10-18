@@ -14,7 +14,35 @@ pub enum ChangeType<T: PartialEq> {
 type Mapping<T> = std::collections::HashMap<usize, ChangeType<T>>;
 type Matrix<T> = Vec<Vec<T>>;
 
-fn main() {}
+pub fn diff<'a, T: Node>(x: &'a T, y: &'a T) -> Vec<ChangeType<&'a T>> {
+    diff_with_costfn(
+        x,
+        y,
+        |_| 1,
+        |_| 1,
+        |x, y| {
+            if x == y {
+                0
+            } else {
+                1
+            }
+        },
+    )
+}
+
+pub fn diff_with_costfn<'a, T: Node>(
+    x: &'a T,
+    y: &'a T,
+    insert: fn(&T) -> usize,
+    delete: fn(&T) -> usize,
+    replace: fn(&T, &T) -> usize,
+) -> Vec<ChangeType<&'a T>> {
+    let (mut D, mut d) = ted(x, y, insert, delete, replace);
+    let mut map = backtrace(x, y, &mut d, &mut D, insert, delete, replace);
+    push_insert_and_delete(&mut map, x, y);
+
+    map
+}
 
 fn ted<T: Node>(
     x: &T,
@@ -209,6 +237,41 @@ fn depth_priority_vec<T: Node>(node: &T) -> Vec<&T> {
     children.insert(0, node);
 
     children
+}
+
+fn push_insert_and_delete<T: Node>(map: &mut Vec<ChangeType<&T>>, x: &T, y: &T) {
+    let xs = depth_priority_vec(x);
+    let ys = depth_priority_vec(y);
+    let mut xs = xs.iter();
+    let mut ys = ys.iter();
+    let mut additional_map = Vec::new();
+    for m in map.iter() {
+        if let ChangeType::Update(x, y) = m {
+            for x_node in &mut xs {
+                if x_node.index() == x.index() {
+                    break;
+                }
+
+                additional_map.push(ChangeType::Delete(x_node));
+            }
+
+            for y_node in &mut ys {
+                if y_node.index() == y.index() {
+                    break;
+                }
+
+                additional_map.push(ChangeType::Insert(y_node));
+            }
+        }
+    }
+
+    for x in xs {
+        additional_map.push(ChangeType::Delete(x));
+    }
+
+    for y in ys {
+        additional_map.push(ChangeType::Insert(y));
+    }
 }
 
 #[cfg(test)]
