@@ -8,7 +8,6 @@ pub enum ChangeType<T: PartialEq> {
     Delete(T),
     Insert(T),
     Update(T, T),
-    None,
 }
 
 type Matrix<T> = Vec<Vec<T>>;
