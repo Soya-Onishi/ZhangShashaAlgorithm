@@ -16,22 +16,26 @@ impl N {
     }
 }
 
+// Implement Node trait for tree node struct
 impl zsdiff::Node for N {
     fn children(&self) -> &[Self] {
         &self.children[..]
     }
 
+    // each node index must be depth priority order of tree
     fn index(&self) -> usize {
         self.index
     }
 }
 
+// PartialEq must check equality of node except index
 impl PartialEq for N {
     fn eq(&self, other: &Self) -> bool {
         self.content == other.content
     }
 }
 
+// PartialOrd must compare node index
 impl PartialOrd for N {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.index.cmp(&other.index))
