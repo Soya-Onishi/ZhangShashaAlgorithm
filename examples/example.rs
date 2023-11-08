@@ -21,11 +21,6 @@ impl zsdiff::Node for N {
     fn children(&self) -> &[Self] {
         &self.children[..]
     }
-
-    // each node index must be depth priority order of tree
-    fn index(&self) -> usize {
-        self.index
-    }
 }
 
 // PartialEq must check equality of node except index

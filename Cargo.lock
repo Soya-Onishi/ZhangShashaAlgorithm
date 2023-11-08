@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "zhang_shasha_diff"
+name = "zhang-shasha-diff"
 version = "0.1.0"

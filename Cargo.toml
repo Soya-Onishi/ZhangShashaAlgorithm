@@ -1,5 +1,5 @@
 [package]
-name = "zhang_shasha_diff"
+name = "zhang-shasha-diff"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,4 @@ edition = "2021"
 
 [[example]]
 name = "example"
-crate-type = ["bin"]
-
-[dependencies]
+path = "examples/example.rs"
