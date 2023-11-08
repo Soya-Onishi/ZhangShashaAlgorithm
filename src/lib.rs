@@ -1,4 +1,4 @@
-pub trait Node: PartialEq + PartialOrd + Sized {
+pub trait Node: PartialEq + Sized {
     //    fn index(&self) -> usize;
     fn children(&self) -> &[Self];
 }
